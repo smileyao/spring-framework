@@ -110,6 +110,7 @@ public class GenericApplicationContext extends AbstractApplicationContext implem
 	 * @see #refresh
 	 */
 	public GenericApplicationContext() {
+		//创建默认的beanFactory
 		this.beanFactory = new DefaultListableBeanFactory();
 	}
 
