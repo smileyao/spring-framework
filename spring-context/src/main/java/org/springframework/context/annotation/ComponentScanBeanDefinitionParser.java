@@ -77,17 +77,32 @@ public class ComponentScanBeanDefinitionParser implements BeanDefinitionParser {
 	private static final String FILTER_EXPRESSION_ATTRIBUTE = "expression";
 
 
+	/**
+	 * 扫描 base-package 目录，将使用了 @Component、@Controller、@Repository、@Service 注解的 bean 注册到注册表中（其实就是beanDefinitionMap、beanDefinitionNames、aliasMap缓存中），跟之前解析默认命名空间一样，也是在后续创建 bean 时需要使用这些缓存。
+	 * 添加了几个内部的注解相关的后置处理器：ConfigurationClassPostProcessor、AutowiredAnnotationBeanPostProcessor、RequiredAnnotationBeanPostProcessor 等。
+	 *
+	 * @param element the element that is to be parsed into one or more {@link BeanDefinition BeanDefinitions}
+	 * @param parserContext the object encapsulating the current state of the parsing process;
+	 * provides access to a {@link org.springframework.beans.factory.support.BeanDefinitionRegistry}
+	 * @return
+	 */
 	@Override
 	@Nullable
 	public BeanDefinition parse(Element element, ParserContext parserContext) {
+		// 1.拿到<context:component-scan>节点的base-package属性值
 		String basePackage = element.getAttribute(BASE_PACKAGE_ATTRIBUTE);
+		// 2.解析占位符, 例如 ${basePackage}
 		basePackage = parserContext.getReaderContext().getEnvironment().resolvePlaceholders(basePackage);
+		// 3.解析base-package（允许通过 ",; \t\n" 中的任一符号填写多个），例如: com.joonwhee.open.one;com.joonwhee.open.two
 		String[] basePackages = StringUtils.tokenizeToStringArray(basePackage,
 				ConfigurableApplicationContext.CONFIG_LOCATION_DELIMITERS);
 
 		// Actually scan for bean definitions and register them.
+		// 4.构建和配置ClassPathBeanDefinitionScanner
 		ClassPathBeanDefinitionScanner scanner = configureScanner(parserContext, element);
+		// 5.使用scanner在指定的basePackages包中执行扫描，返回已注册的bean定义
 		Set<BeanDefinitionHolder> beanDefinitions = scanner.doScan(basePackages);
+		// 6.组件注册（包括注册一些内部的注解后置处理器、触发注册事件）
 		registerComponents(parserContext.getReaderContext(), beanDefinitions, element);
 
 		return null;
@@ -95,20 +110,23 @@ public class ComponentScanBeanDefinitionParser implements BeanDefinitionParser {
 
 	protected ClassPathBeanDefinitionScanner configureScanner(ParserContext parserContext, Element element) {
 		boolean useDefaultFilters = true;
+		// 1.解析use-default-filters属性，默认为true，用于指示是否使用默认的filter
 		if (element.hasAttribute(USE_DEFAULT_FILTERS_ATTRIBUTE)) {
 			useDefaultFilters = Boolean.parseBoolean(element.getAttribute(USE_DEFAULT_FILTERS_ATTRIBUTE));
 		}
 
 		// Delegate bean definition registration to scanner class.
+		// 2.构建ClassPathBeanDefinitionScanner，将bean定义注册委托给scanner类
 		ClassPathBeanDefinitionScanner scanner = createScanner(parserContext.getReaderContext(), useDefaultFilters);
 		scanner.setBeanDefinitionDefaults(parserContext.getDelegate().getBeanDefinitionDefaults());
 		scanner.setAutowireCandidatePatterns(parserContext.getDelegate().getAutowireCandidatePatterns());
-
+		// 3.解析resource-pattern属性
 		if (element.hasAttribute(RESOURCE_PATTERN_ATTRIBUTE)) {
 			scanner.setResourcePattern(element.getAttribute(RESOURCE_PATTERN_ATTRIBUTE));
 		}
 
 		try {
+			// 4.解析name-generator属性
 			parseBeanNameGenerator(element, scanner);
 		}
 		catch (Exception ex) {
@@ -116,12 +134,13 @@ public class ComponentScanBeanDefinitionParser implements BeanDefinitionParser {
 		}
 
 		try {
+			// 5.解析scope-resolver、scoped-proxy属性
 			parseScope(element, scanner);
 		}
 		catch (Exception ex) {
 			parserContext.getReaderContext().error(ex.getMessage(), parserContext.extractSource(element), ex.getCause());
 		}
-
+		// 6.解析类型过滤器
 		parseTypeFilters(element, scanner, parserContext);
 
 		return scanner;
@@ -136,8 +155,9 @@ public class ComponentScanBeanDefinitionParser implements BeanDefinitionParser {
 			XmlReaderContext readerContext, Set<BeanDefinitionHolder> beanDefinitions, Element element) {
 
 		Object source = readerContext.extractSource(element);
+		// 1.使用注解的tagName（例如: context:component-scan）和source 构建CompositeComponentDefinition
 		CompositeComponentDefinition compositeDef = new CompositeComponentDefinition(element.getTagName(), source);
-
+		// 2.将扫描到的所有BeanDefinition添加到compositeDef的nestedComponents属性中
 		for (BeanDefinitionHolder beanDefHolder : beanDefinitions) {
 			compositeDef.addNestedComponent(new BeanComponentDefinition(beanDefHolder));
 		}
@@ -145,16 +165,19 @@ public class ComponentScanBeanDefinitionParser implements BeanDefinitionParser {
 		// Register annotation config processors, if necessary.
 		boolean annotationConfig = true;
 		if (element.hasAttribute(ANNOTATION_CONFIG_ATTRIBUTE)) {
+			// 3.获取component-scan标签的annotation-config属性值（默认为true）
 			annotationConfig = Boolean.parseBoolean(element.getAttribute(ANNOTATION_CONFIG_ATTRIBUTE));
 		}
 		if (annotationConfig) {
+			// 4.如果annotation-config属性值为true，在给定的注册表中注册所有用于注解的Bean后置处理器
 			Set<BeanDefinitionHolder> processorDefinitions =
 					AnnotationConfigUtils.registerAnnotationConfigProcessors(readerContext.getRegistry(), source);
 			for (BeanDefinitionHolder processorDefinition : processorDefinitions) {
+				// 5.将注册的注解后置处理器的BeanDefinition添加到compositeDef的nestedComponents属性中
 				compositeDef.addNestedComponent(new BeanComponentDefinition(processorDefinition));
 			}
 		}
-
+		// 6.触发组件注册事件，默认实现为EmptyReaderEventListener（空实现，没有具体操作）
 		readerContext.fireComponentRegistered(compositeDef);
 	}
 
@@ -201,17 +224,33 @@ public class ComponentScanBeanDefinitionParser implements BeanDefinitionParser {
 		// Parse exclude and include filter elements.
 		ClassLoader classLoader = scanner.getResourceLoader().getClassLoader();
 		NodeList nodeList = element.getChildNodes();
+		// 1.遍历解析element下的所有子节点
 		for (int i = 0; i < nodeList.getLength(); i++) {
 			Node node = nodeList.item(i);
 			if (node.getNodeType() == Node.ELEMENT_NODE) {
+				// 拿到节点的localName
+				// 例如节点：<context:exclude-filter type="" expression=""/>，localName为：exclude-filter
 				String localName = parserContext.getDelegate().getLocalName(node);
 				try {
+					/**
+					 * 配置了 component-scan 时，Spring会去扫描 base-package 下所有使用了 @Component（包括@Controller、@Repository、@Service） 注解的 bean。这是因为 use-default-filters 属性默认值为 true，而通过代码块3我们知道，use-default-filters = true 时，includeFilters 会有两个 AnnotationTypeFilter，分别对应 @Component 注解和 @ManagedBean 注解。
+					 * 如果我们想排除掉使用了 @Controller 注解的 bean 时，就可以使用 exclude-filter 属性，例如以下配置。
+					 * <context:component-scan base-package="com.joonwhee.open">
+					 *     <context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller"/>
+					 * </context:component-scan>
+					 */
+					// 2.解析include-filter子节点
 					if (INCLUDE_FILTER_ELEMENT.equals(localName)) {
+						// 2.1 构建TypeFilter
 						TypeFilter typeFilter = createTypeFilter((Element) node, classLoader, parserContext);
+						// 2.2 添加到scanner的includeFilters属性
 						scanner.addIncludeFilter(typeFilter);
 					}
+					// 3.解析exclude-filter子节点
 					else if (EXCLUDE_FILTER_ELEMENT.equals(localName)) {
+						// 3.1 构建TypeFilter
 						TypeFilter typeFilter = createTypeFilter((Element) node, classLoader, parserContext);
+						// 3.2 添加到scanner的excludeFilters属性
 						scanner.addExcludeFilter(typeFilter);
 					}
 				}
@@ -230,24 +269,31 @@ public class ComponentScanBeanDefinitionParser implements BeanDefinitionParser {
 	@SuppressWarnings("unchecked")
 	protected TypeFilter createTypeFilter(Element element, @Nullable ClassLoader classLoader,
 			ParserContext parserContext) throws ClassNotFoundException {
-
+		// 1.获取type、expression
 		String filterType = element.getAttribute(FILTER_TYPE_ATTRIBUTE);
 		String expression = element.getAttribute(FILTER_EXPRESSION_ATTRIBUTE);
 		expression = parserContext.getReaderContext().getEnvironment().resolvePlaceholders(expression);
+		// 2.根据filterType，返回对应的TypeFilter，例如annotation返回AnnotationTypeFilter
 		if ("annotation".equals(filterType)) {
+			// 2.1 指定过滤的注解, expression为注解的类全名称, 例如: org.springframework.stereotype.Controller
 			return new AnnotationTypeFilter((Class<Annotation>) ClassUtils.forName(expression, classLoader));
 		}
 		else if ("assignable".equals(filterType)) {
+			// 2.2 指定过滤的类或接口, 包括子类和子接口, expression为类全名称
 			return new AssignableTypeFilter(ClassUtils.forName(expression, classLoader));
 		}
 		else if ("aspectj".equals(filterType)) {
+			// 2.3 指定aspectj表达式来过滤类, expression为aspectj表达式字符串
 			return new AspectJTypeFilter(expression, classLoader);
 		}
 		else if ("regex".equals(filterType)) {
+			// 2.4 通过正则表达式来过滤类, expression为正则表达式字符串
 			return new RegexPatternTypeFilter(Pattern.compile(expression));
 		}
 		else if ("custom".equals(filterType)) {
+			// 2.5 用户自定义过滤器类型, expression为自定义过滤器的类全名称
 			Class<?> filterClass = ClassUtils.forName(expression, classLoader);
+			// 自定义的过滤器必须实现TypeFilter接口, 否则抛异常
 			if (!TypeFilter.class.isAssignableFrom(filterClass)) {
 				throw new IllegalArgumentException(
 						"Class is not assignable to [" + TypeFilter.class.getName() + "]: " + expression);

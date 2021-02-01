@@ -89,8 +89,11 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
 	 * {@link Configuration @Configuration} classes
 	 */
 	public AnnotationConfigApplicationContext(Class<?>... componentClasses) {
+		//创建AnnotatedBeanDefinitionReader，初始化默认的beanFactory（DefaultListableBeanFactory）
 		this();
+		//将启动类的BeanDefinition注册到容器
 		register(componentClasses);
+		//刷新上下文
 		refresh();
 	}
 

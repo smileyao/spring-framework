@@ -184,7 +184,9 @@ public abstract class AbstractBeanDefinitionReader implements BeanDefinitionRead
 	public int loadBeanDefinitions(Resource... resources) throws BeanDefinitionStoreException {
 		Assert.notNull(resources, "Resource array must not be null");
 		int count = 0;
+		// 1.遍历所有的Resource
 		for (Resource resource : resources) {
+			// 2.根据Resource加载bean的定义，XmlBeanDefinitionReader实现
 			count += loadBeanDefinitions(resource);
 		}
 		return count;
@@ -211,15 +213,17 @@ public abstract class AbstractBeanDefinitionReader implements BeanDefinitionRead
 	 * @see #loadBeanDefinitions(org.springframework.core.io.Resource[])
 	 */
 	public int loadBeanDefinitions(String location, @Nullable Set<Resource> actualResources) throws BeanDefinitionStoreException {
+		//获取资源加载器，ResourceLoader(PathMatchingResourcePatternResolver)
 		ResourceLoader resourceLoader = getResourceLoader();
 		if (resourceLoader == null) {
 			throw new BeanDefinitionStoreException(
 					"Cannot load bean definitions from location [" + location + "]: no ResourceLoader available");
 		}
-
+		// 2.判断 resourceLoader 是否为 ResourcePatternResolver 的实例
 		if (resourceLoader instanceof ResourcePatternResolver) {
 			// Resource pattern matching available.
 			try {
+				// 2.1 根据路径拿到该路径下所有符合的配置文件，并封装成Resource
 				Resource[] resources = ((ResourcePatternResolver) resourceLoader).getResources(location);
 				int count = loadBeanDefinitions(resources);
 				if (actualResources != null) {
@@ -237,7 +241,9 @@ public abstract class AbstractBeanDefinitionReader implements BeanDefinitionRead
 		}
 		else {
 			// Can only load single resources by absolute URL.
+			// 3.只能通过绝对URL加载单个资源
 			Resource resource = resourceLoader.getResource(location);
+			// 3.1 根据Resource，加载Bean的定义
 			int count = loadBeanDefinitions(resource);
 			if (actualResources != null) {
 				actualResources.add(resource);

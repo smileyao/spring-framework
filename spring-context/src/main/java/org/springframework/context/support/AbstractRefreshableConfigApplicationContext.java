@@ -98,6 +98,7 @@ public abstract class AbstractRefreshableConfigApplicationContext extends Abstra
 	 */
 	@Nullable
 	protected String[] getConfigLocations() {
+		//web.xml中contextConfigLocation 的参数值
 		return (this.configLocations != null ? this.configLocations : getDefaultConfigLocations());
 	}
 

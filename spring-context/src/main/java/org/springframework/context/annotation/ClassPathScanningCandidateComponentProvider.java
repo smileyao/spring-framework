@@ -203,9 +203,11 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	 */
 	@SuppressWarnings("unchecked")
 	protected void registerDefaultFilters() {
+		// 1.添加@Component注解Filter到includeFilters中
 		this.includeFilters.add(new AnnotationTypeFilter(Component.class));
 		ClassLoader cl = ClassPathScanningCandidateComponentProvider.class.getClassLoader();
 		try {
+			// 2.添加@ManagedBean注解Filter到includeFilters中
 			this.includeFilters.add(new AnnotationTypeFilter(
 					((Class<? extends Annotation>) ClassUtils.forName("javax.annotation.ManagedBean", cl)), false));
 			logger.trace("JSR-250 'javax.annotation.ManagedBean' found and supported for component scanning");
@@ -214,6 +216,7 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 			// JSR-250 1.1 API (as included in Java EE 6) not available - simply skip.
 		}
 		try {
+			// 3.添加@Named注解Filter到includeFilters中，这边会抛ClassNotFoundException
 			this.includeFilters.add(new AnnotationTypeFilter(
 					((Class<? extends Annotation>) ClassUtils.forName("javax.inject.Named", cl)), false));
 			logger.trace("JSR-330 'javax.inject.Named' annotation found and supported for component scanning");
@@ -415,25 +418,32 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	private Set<BeanDefinition> scanCandidateComponents(String basePackage) {
 		Set<BeanDefinition> candidates = new LinkedHashSet<>();
 		try {
+			// 1.根据我们配置的包名，组装成要扫描的通配包路径，例如：com.joonwhee.open 会被组装成: classpath*:com/joonwhee/open/**/*.class
 			String packageSearchPath = ResourcePatternResolver.CLASSPATH_ALL_URL_PREFIX +
 					resolveBasePackage(basePackage) + '/' + this.resourcePattern;
+			// 2.根据通配包路径匹配拿到所有匹配的类资源（本项目依赖的jar，如果路径也符合，则会一起扫描进来）
 			Resource[] resources = getResourcePatternResolver().getResources(packageSearchPath);
 			boolean traceEnabled = logger.isTraceEnabled();
 			boolean debugEnabled = logger.isDebugEnabled();
+			// 3.遍历所有匹配的类资源
 			for (Resource resource : resources) {
 				if (traceEnabled) {
 					logger.trace("Scanning " + resource);
 				}
 				if (resource.isReadable()) {
 					try {
+						// 4.使用metadataReader读取资源，MetadataReader是专门用来访问元数据的类（包括: 类元数据ClassMetadata、注解元数据AnnotationMetadata等）
 						MetadataReader metadataReader = getMetadataReaderFactory().getMetadataReader(resource);
+						// 5.使用过滤器检查给定的类是否为候选类（候选类: 与excludeFilters的所有Filter不匹配，并且与includeFilters的至少一个Filter匹配）
 						if (isCandidateComponent(metadataReader)) {
 							ScannedGenericBeanDefinition sbd = new ScannedGenericBeanDefinition(metadataReader);
 							sbd.setSource(resource);
+							// 6.判断sbd是否为候选类(独立的 && (具体的实现类 || (抽象类 && 类中有方法使用@Lookup注解)))
 							if (isCandidateComponent(sbd)) {
 								if (debugEnabled) {
 									logger.debug("Identified candidate component class: " + resource);
 								}
+								// 7.确定是候选类，则添加到candidates
 								candidates.add(sbd);
 							}
 							else {
@@ -488,11 +498,15 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	protected boolean isCandidateComponent(MetadataReader metadataReader) throws IOException {
 		for (TypeFilter tf : this.excludeFilters) {
 			if (tf.match(metadataReader, getMetadataReaderFactory())) {
+				// 如果metadataReader与excludeFilters中的任意一个匹配，则返回false，表示metadataReader对应的类不是候选者类
 				return false;
 			}
 		}
+		// includeFilters默认包含: org.springframework.stereotype.Component注解、javax.annotation.ManagedBean注解
 		for (TypeFilter tf : this.includeFilters) {
 			if (tf.match(metadataReader, getMetadataReaderFactory())) {
+				// 如果metadataReader与includeFilters中的任意一个TypeFilter匹配（如果tf为Component注解：metadataReader对应的类使用了Component则匹配），
+				// 则判断@Conditional注解是否匹配（@Conditional基本不用，此处不深入解析）；如果匹配，则返回true，表示metadataReader对应的类为候选者类
 				return isConditionMatch(metadataReader);
 			}
 		}
@@ -523,6 +537,10 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	 */
 	protected boolean isCandidateComponent(AnnotatedBeanDefinition beanDefinition) {
 		AnnotationMetadata metadata = beanDefinition.getMetadata();
+		// isIndependent：确定底层类是否是独立的，即它是否是顶级类或嵌套类（静态内部类），它可以独立于封闭类构造。
+		// isConcrete：返回底层类是表示具体类，即：既不是接口也不是抽象类。
+		// isAbstract：返回底层类是否标记为抽象。
+		// hasAnnotatedMethods：确定基础类是否具有使用给定注解（@Lookup）类型进行注解（或元注解）的任何方法。
 		return (metadata.isIndependent() && (metadata.isConcrete() ||
 				(metadata.isAbstract() && metadata.hasAnnotatedMethods(Lookup.class.getName()))));
 	}

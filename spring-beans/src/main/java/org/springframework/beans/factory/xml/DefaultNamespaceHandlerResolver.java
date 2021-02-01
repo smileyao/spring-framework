@@ -115,24 +115,36 @@ public class DefaultNamespaceHandlerResolver implements NamespaceHandlerResolver
 	@Override
 	@Nullable
 	public NamespaceHandler resolve(String namespaceUri) {
+		// 1.拿到配置文件的所有命名空间和对应的handler
+		// 例如："http://www.springframework.org/schema/aop" -> "org.springframework.aop.config.AopNamespaceHandler"
 		Map<String, Object> handlerMappings = getHandlerMappings();
+		// 2.拿到当前命名空间对应的handler （可能是handler的className，也可能是已经实例化的handler）
 		Object handlerOrClassName = handlerMappings.get(namespaceUri);
 		if (handlerOrClassName == null) {
+			// 2.1 如果不存在namespaceUri对应的handler，则返回null
 			return null;
 		}
 		else if (handlerOrClassName instanceof NamespaceHandler) {
+			// 2.2 如果是已经实例化的handler，则直接强转返回
 			return (NamespaceHandler) handlerOrClassName;
 		}
 		else {
+			// 2.3 如果是handler的className
 			String className = (String) handlerOrClassName;
 			try {
+				// 2.3.1 根据className，使用类加载器拿到该类
 				Class<?> handlerClass = ClassUtils.forName(className, this.classLoader);
+				// 2.3.2 校验是否是继承自NamespaceHandler（所有的handler都继承自NamespaceHandler）
 				if (!NamespaceHandler.class.isAssignableFrom(handlerClass)) {
 					throw new FatalBeanException("Class [" + className + "] for namespace [" + namespaceUri +
 							"] does not implement the [" + NamespaceHandler.class.getName() + "] interface");
 				}
+				// 2.3.3 使用无参构造函数实例化handlerClass类
 				NamespaceHandler namespaceHandler = (NamespaceHandler) BeanUtils.instantiateClass(handlerClass);
+				// 2.3.4 调用handler类的初始化方法(将命名空间下的节点名和对应的解析器注册到parsers缓存中)
 				namespaceHandler.init();
+				// 2.3.5 将实例化的handler放到缓存，替换原来的className
+				// 原来为: namespaceUri -> handler的className，会被覆盖成: namespaceUri -> 实例化的handler
 				handlerMappings.put(namespaceUri, namespaceHandler);
 				return namespaceHandler;
 			}
@@ -152,21 +164,26 @@ public class DefaultNamespaceHandlerResolver implements NamespaceHandlerResolver
 	 */
 	private Map<String, Object> getHandlerMappings() {
 		Map<String, Object> handlerMappings = this.handlerMappings;
+		// 1.如果handlerMappings已经加载过，则直接返回
 		if (handlerMappings == null) {
 			synchronized (this) {
 				handlerMappings = this.handlerMappings;
+				// 2.如果handlerMappings还没加载过，则进行加载
 				if (handlerMappings == null) {
 					if (logger.isTraceEnabled()) {
 						logger.trace("Loading NamespaceHandler mappings from [" + this.handlerMappingsLocation + "]");
 					}
 					try {
+						// 2.1 使用给定的类加载器从指定的类路径资源加载所有属性，见XmlBeanDefinitionReader.getNamespaceHandlerResolver
 						Properties mappings =
 								PropertiesLoaderUtils.loadAllProperties(this.handlerMappingsLocation, this.classLoader);
 						if (logger.isTraceEnabled()) {
 							logger.trace("Loaded NamespaceHandler mappings: " + mappings);
 						}
+						// 2.2 将Properties转换成Map, mappings -> handlerMappings
 						handlerMappings = new ConcurrentHashMap<>(mappings.size());
 						CollectionUtils.mergePropertiesIntoMap(mappings, handlerMappings);
+						// 2.3 将加载到的所有命名空间映射放到缓存
 						this.handlerMappings = handlerMappings;
 					}
 					catch (IOException ex) {
