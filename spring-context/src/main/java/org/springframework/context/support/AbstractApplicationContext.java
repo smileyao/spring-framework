@@ -819,11 +819,32 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	}
 
 	/**
+	 * 1.整个 invokeBeanFactoryPostProcessors 方法围绕两个接口，BeanDefinitionRegistryPostProcessor 和 BeanFactoryPostProcessor，其中 BeanDefinitionRegistryPostProcessor 继承了 BeanFactoryPostProcessor 。BeanDefinitionRegistryPostProcessor 主要用来在常规 BeanFactoryPostProcessor 检测开始之前注册其他 Bean 定义，说的简单点，就是 BeanDefinitionRegistryPostProcessor 具有更高的优先级，执行顺序在 BeanFactoryPostProcessor 之前。
+	 * 2.整个 invokeBeanFactoryPostProcessors 方法操作了 3 种 bean 对象：
+	 * 入参 beanFactoryPostProcessors：这个我们在代码块1中解析过，拿的是 AbstractApplicationContext 类的 beanFactoryPostProcessors 属性值，也就是在之前已经添加到 beanFactoryPostProcessors 中的 BeanFactoryPostProcessor。
+	 * BeanDefinitionRegistryPostProcessor 接口实现类：实现了 BeanDefinitionRegistryPostProcessor 接口，并且注册到 Spring IoC容器中。
+	 * 常规 BeanFactoryPostProcessor 接口实现类：实现了 BeanFactoryPostProcessor 接口，并且注册到 Spring IoC容器中。
+	 * 3.操作3种 bean 对象具体指的是调用它们重写的方法，调用实现方法时会遵循以下的优先级：
+	 *
+	 * 第一优先级：入参 beanFactoryPostProcessors 中的 BeanDefinitionRegistryPostProcessor， 调用 postProcessBeanDefinitionRegistry 方法（2.1.1）。
+	 * 第二优先级：BeanDefinitionRegistryPostProcessor 接口实现类，并且实现了 PriorityOrdered 接口，调用 postProcessBeanDefinitionRegistry 方法（3.8）。
+	 * 第三优先级：BeanDefinitionRegistryPostProcessor 接口实现类，并且实现了 Ordered 接口，调用 postProcessBeanDefinitionRegistry 方法（4.2）。
+	 * 第四优先级：除去第二优先级和第三优先级，剩余的 BeanDefinitionRegistryPostProcessor 接口实现类，调用 postProcessBeanDefinitionRegistry 方法（5.4）。
+	 * 第五优先级：所有 BeanDefinitionRegistryPostProcessor 接口实现类，调用 postProcessBeanFactory 方法（6）。
+	 * 第六优先级：入参 beanFactoryPostProcessors 中的常规 BeanFactoryPostProcessor，调用 postProcessBeanFactory 方法（7）。
+	 * 第七优先级：常规 BeanFactoryPostProcessor 接口实现类，并且实现了 PriorityOrdered 接口，调用 postProcessBeanFactory 方法（9.2）。
+	 * 第八优先级：常规 BeanFactoryPostProcessor 接口实现类，并且实现了 Ordered 接口，调用 postProcessBeanFactory 方法（10.3）。
+	 * 第九优先级：除去第七优先级和第八优先级，剩余的常规 BeanFactoryPostProcessor 接口的实现类，调用 postProcessBeanFactory 方法（11.2）。
+	 * 4.本文还引入了两个用于排序的重要接口：PriorityOrdered 和 Ordered，其中 PriorityOrdered 继承了 Ordered，并且 PriorityOrdered 的优先级要高于 Ordered，这跟 BeanDefinitionRegistryPostProcessor 继承 BeanFactoryPostProcessor 有点类似。实现 Ordered 接口需要重写 getOrder 方法，返回一个用于排序的 order 值，order 值的范围为 Integer.MIN_VALUE ~ Integer.MAX_VALUE，order 值越小优先级越高，Integer.MIN_VALUE 拥有最高优先级，而 Integer.MAX_VALUE 则对应的拥有最低优先级。
+	 *
+	 * 5.常见的 Java EE 相关的框架或者中间件，经常使用 BeanFactoryPostProcessor 来进行扩展，例如上面的 Mybatis，因此了解 BeanFactoryPostProcessor 的原理会对之后理解其他中间件的原理有帮助。
 	 * Instantiate and invoke all registered BeanFactoryPostProcessor beans,
 	 * respecting explicit order if given.
 	 * <p>Must be called before singleton instantiation.
 	 */
 	protected void invokeBeanFactoryPostProcessors(ConfigurableListableBeanFactory beanFactory) {
+		// 1.getBeanFactoryPostProcessors(): 拿到当前应用上下文beanFactoryPostProcessors变量中的值
+		// 2.invokeBeanFactoryPostProcessors: 实例化并调用所有已注册的BeanFactoryPostProcessor
 		PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(beanFactory, getBeanFactoryPostProcessors());
 
 		// Detect a LoadTimeWeaver and prepare for weaving, if found in the meantime
