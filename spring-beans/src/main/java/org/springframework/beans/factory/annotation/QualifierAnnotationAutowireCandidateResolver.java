@@ -143,8 +143,10 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
 	 */
 	@Override
 	public boolean isAutowireCandidate(BeanDefinitionHolder bdHolder, DependencyDescriptor descriptor) {
+		// 1.调用父类方法判断此bean是否可以自动注入到其他bean
 		boolean match = super.isAutowireCandidate(bdHolder, descriptor);
 		if (match) {
+			// 2.@Qualifiers注解检查
 			match = checkQualifiers(bdHolder, descriptor.getAnnotations());
 			if (match) {
 				MethodParameter methodParam = descriptor.getMethodParameter();

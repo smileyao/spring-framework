@@ -639,22 +639,8 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				registerListeners();
 
 				// Instantiate all remaining (non-lazy-init) singletons.
-
 				/**
-				 * 该方法会实例化所有剩余的非懒加载单例 bean。
-				 * 除了一些内部的 bean、实现了 BeanFactoryPostProcessor 接口的 bean、实现了 BeanPostProcessor 接口的 bean，
-				 * 其他的非懒加载单例 bean 都会在这个方法中被实例化，并且 BeanPostProcessor 的触发也是在这个方法中。
-				 * 1、遍历所有被加载到缓存中的 beanName，触发所有剩余的非懒加载单例 bean 的实例化。
-				 * 2、首先通过 beanName 尝试从缓存中获取，如果存在则跳过实例化过程；否则，进行 bean 的实例化。
-				 * 3、根据 BeanDefinition，使用构造函数创建 bean 实例。
-				 * 4、根据 BeanDefinition，进行 bean 实例属性填充。
-				 * 5、执行 bean 实例的初始化。
-				 * 5.1、触发 Aware 方法。
-				 * 5.2、触发 BeanPostProcessor 的 postProcessBeforeInitialization 方法。
-				 * 5.3、如果 bean 实现了 InitializingBean 接口，则触发 afterPropertiesSet() 方法。
-				 * 5.4、如果 bean 设置了 init-method 属性，则触发 init-method 指定的方法。
-				 * 5.5、触发 BeanPostProcessor 的 postProcessAfterInitialization 方法。
-				 * 6、将创建好的 bean 实例放到缓存中，用于之后使用。
+				 * Spring IoC 核心中的核心,该方法会实例化所有剩余的非懒加载单例 bean。
 				 */
 				finishBeanFactoryInitialization(beanFactory);
 
@@ -861,6 +847,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	 * <p>Must be called before any instantiation of application beans.
 	 */
 	protected void registerBeanPostProcessors(ConfigurableListableBeanFactory beanFactory) {
+		// 1.注册BeanPostProcessor
 		PostProcessorRegistrationDelegate.registerBeanPostProcessors(beanFactory, this);
 	}
 
@@ -986,11 +973,26 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	}
 
 	/**
+	 * 该方法会实例化所有剩余的非懒加载单例 bean。
+	 * 除了一些内部的 bean、实现了 BeanFactoryPostProcessor 接口的 bean、实现了 BeanPostProcessor 接口的 bean，
+	 * 其他的非懒加载单例 bean 都会在这个方法中被实例化，并且 BeanPostProcessor 的触发也是在这个方法中。
+	 * 1、遍历所有被加载到缓存中的 beanName，触发所有剩余的非懒加载单例 bean 的实例化。
+	 * 2、首先通过 beanName 尝试从缓存中获取，如果存在则跳过实例化过程；否则，进行 bean 的实例化。
+	 * 3、根据 BeanDefinition，使用构造函数创建 bean 实例。
+	 * 4、根据 BeanDefinition，进行 bean 实例属性填充。
+	 * 5、执行 bean 实例的初始化。
+	 ** 5.1、触发 Aware 方法。
+	 ** 5.2、触发 BeanPostProcessor 的 postProcessBeforeInitialization 方法。
+	 ** 5.3、如果 bean 实现了 InitializingBean 接口，则触发 afterPropertiesSet() 方法。
+	 ** 5.4、如果 bean 设置了 init-method 属性，则触发 init-method 指定的方法。
+	 ** 5.5、触发 BeanPostProcessor 的 postProcessAfterInitialization 方法。
+	 ** 6、将创建好的 bean 实例放到缓存中，用于之后使用。
 	 * Finish the initialization of this context's bean factory,
 	 * initializing all remaining singleton beans.
 	 */
 	protected void finishBeanFactoryInitialization(ConfigurableListableBeanFactory beanFactory) {
 		// Initialize conversion service for this context.
+		// 1.初始化此上下文的转换服务
 		if (beanFactory.containsBean(CONVERSION_SERVICE_BEAN_NAME) &&
 				beanFactory.isTypeMatch(CONVERSION_SERVICE_BEAN_NAME, ConversionService.class)) {
 			beanFactory.setConversionService(
@@ -1000,11 +1002,13 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		// Register a default embedded value resolver if no bean post-processor
 		// (such as a PropertyPlaceholderConfigurer bean) registered any before:
 		// at this point, primarily for resolution in annotation attribute values.
+		// 2.如果beanFactory之前没有注册嵌入值解析器，则注册默认的嵌入值解析器：主要用于注解属性值的解析。
 		if (!beanFactory.hasEmbeddedValueResolver()) {
 			beanFactory.addEmbeddedValueResolver(strVal -> getEnvironment().resolvePlaceholders(strVal));
 		}
 
 		// Initialize LoadTimeWeaverAware beans early to allow for registering their transformers early.
+		// 3.初始化LoadTimeWeaverAware Bean实例对象
 		String[] weaverAwareNames = beanFactory.getBeanNamesForType(LoadTimeWeaverAware.class, false, false);
 		for (String weaverAwareName : weaverAwareNames) {
 			getBean(weaverAwareName);
@@ -1014,9 +1018,11 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		beanFactory.setTempClassLoader(null);
 
 		// Allow for caching all bean definition metadata, not expecting further changes.
+		// 4.冻结所有bean定义，注册的bean定义不会被修改或进一步后处理，因为马上要创建 Bean 实例对象了
 		beanFactory.freezeConfiguration();
 
 		// Instantiate all remaining (non-lazy-init) singletons.
+		// 5.实例化所有剩余（非懒加载）单例对象
 		beanFactory.preInstantiateSingletons();
 	}
 
