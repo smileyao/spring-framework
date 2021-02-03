@@ -111,6 +111,7 @@ final class PostProcessorRegistrationDelegate {
 			// First, invoke the BeanDefinitionRegistryPostProcessors that implement PriorityOrdered.
 			// 3.调用所有实现PriorityOrdered接口的BeanDefinitionRegistryPostProcessor实现类
 			// 3.1 找出所有实现BeanDefinitionRegistryPostProcessor接口的Bean的beanName
+			// 注：springboot的自动装配在这里处理，处理器为ConfigurationClassPostProcessor，在AnnotationConfigUtils.registerAnnotationConfigProcessors注册的
 			String[] postProcessorNames =
 					beanFactory.getBeanNamesForType(BeanDefinitionRegistryPostProcessor.class, true, false);
 			for (String ppName : postProcessorNames) {
