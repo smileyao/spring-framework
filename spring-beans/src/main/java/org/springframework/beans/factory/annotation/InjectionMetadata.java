@@ -100,22 +100,30 @@ public class InjectionMetadata {
 
 	public void checkConfigMembers(RootBeanDefinition beanDefinition) {
 		Set<InjectedElement> checkedElements = new LinkedHashSet<>(this.injectedElements.size());
+		// 1.遍历检查所有要注入的元素
 		for (InjectedElement element : this.injectedElements) {
 			Member member = element.getMember();
+			// 2.如果beanDefinition的externallyManagedConfigMembers属性不包含该member
 			if (!beanDefinition.isExternallyManagedConfigMember(member)) {
+				// 3.将该member添加到beanDefinition的externallyManagedConfigMembers属性
 				beanDefinition.registerExternallyManagedConfigMember(member);
+				// 4.并将element添加到checkedElements
 				checkedElements.add(element);
 			}
 		}
+		// 5.赋值给checkedElements（检查过的元素）
 		this.checkedElements = checkedElements;
 	}
 
 	public void inject(Object target, @Nullable String beanName, @Nullable PropertyValues pvs) throws Throwable {
+		// 1.如果checkedElements存在，则使用checkedElements，否则使用injectedElements
 		Collection<InjectedElement> checkedElements = this.checkedElements;
 		Collection<InjectedElement> elementsToIterate =
 				(checkedElements != null ? checkedElements : this.injectedElements);
 		if (!elementsToIterate.isEmpty()) {
 			for (InjectedElement element : elementsToIterate) {
+				// 2.解析@Autowired注解生成的元数据类：AutowiredFieldElement、AutowiredMethodElement，
+				// 这两个类继承InjectionMetadata.InjectedElement，各自重写了inject方法。
 				element.inject(target, beanName, pvs);
 			}
 		}
