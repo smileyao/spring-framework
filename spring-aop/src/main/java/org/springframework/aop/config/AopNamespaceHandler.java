@@ -61,12 +61,42 @@ public class AopNamespaceHandler extends NamespaceHandlerSupport {
 	 */
 	@Override
 	public void init() {
+		/**
+		 * <aop:config>
+		 *
+		 * 	<aop:aspect id="myAop" ref="aopTest">
+		 * 		<aop:pointcut id="target" expression="execution(* com.zhipin.service.*.*(..))" />
+		 * 		<aop:before method="before" pointcut-ref="target" />
+		 * 		<aop:after method="after" pointcut-ref="target" />
+		 * 		<aop:around method="around" pointcut-ref="target" />
+		 * 	</aop:aspect>
+		 *
+		 * 	<aop:advisor advice-ref="txAdvice"	pointcut="execution(* com.zhipin.service.*.*(..))" />
+		 * </aop:config>
+		 * <bean id="aopTest" class="com.zhipin.aop.AopTest"></bean>
+		 *
+		 * <tx:advice id="txAdvice" transaction-manager="txManager">
+		 * 	<tx:attributes>
+		 * 		<tx:method name="save*" propagation="REQUIRED" />
+		 * 		<tx:method name="delete*" propagation="REQUIRED" />
+		 * 		<tx:method name="update*" propagation="REQUIRED" />
+		 * 		<tx:method name="*" propagation="SUPPORTS" read-only="true" />
+		 * 	</tx:attributes>
+		 * </tx:advice>
+		 * <bean id="txManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		 * 	<property name="dataSource" ref="dataSource" />
+		 * </bean>
+		 */
 		// In 2.0 XSD as well as in 2.5+ XSDs
+		//注册解析config标签的解析器
 		registerBeanDefinitionParser("config", new ConfigBeanDefinitionParser());
+		//注册解析aspectj-autoproxy标签的解析器
 		registerBeanDefinitionParser("aspectj-autoproxy", new AspectJAutoProxyBeanDefinitionParser());
+		//注册解析范围代理的解析器
 		registerBeanDefinitionDecorator("scoped-proxy", new ScopedProxyBeanDefinitionDecorator());
 
 		// Only in 2.0 XSD: moved to context namespace in 2.5+
+		//注册spring-configured的解析器
 		registerBeanDefinitionParser("spring-configured", new SpringConfiguredBeanDefinitionParser());
 	}
 
